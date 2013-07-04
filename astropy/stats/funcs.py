@@ -19,9 +19,8 @@ __all__ = ['sigma_clip', 'binom_conf_interval', 'binned_binom_proportion',
 __doctest_skip__ = ['binned_binom_proportion']
 __doctest_requires__ = {'binom_conf_interval': ['scipy.special']}
 
-
 def sigma_clip(data, sig=3, iters=1, cenfunc=np.median, varfunc=np.var,
-               axis=None, copy=True):
+               axis=None, copy=True, maxfrac_remove=1.0):
     """ Perform sigma-clipping on the provided data.
 
     This performs the sigma clipping algorithm - i.e. the data will be iterated
@@ -59,6 +58,8 @@ def sigma_clip(data, sig=3, iters=1, cenfunc=np.median, varfunc=np.var,
     copy : bool
         If True, the data array will be copied.  If False, the masked array
         data will contain the same array as `data`.  Defaults to True.
+    maxfrac_remove : float 
+        Clip at most this fraction of the original points.
 
     Returns
     -------
@@ -130,19 +131,26 @@ def sigma_clip(data, sig=3, iters=1, cenfunc=np.median, varfunc=np.var,
         varfunc = lambda d: np.expand_dims(varfunc_in(d, axis=axis), axis=axis)
 
     filtered_data = np.ma.array(data, copy=copy)
-
+    
+    minpoints = int(len(data) * (1 - maxfrac_remove)) + 1
+    
     if iters is None:
         i = -1
         lastrej = filtered_data.count() + 1
         while(filtered_data.count() != lastrej):
             i += 1
             lastrej = filtered_data.count()
+            if lastrej <= minpoints:
+                break
             do = filtered_data - cenfunc(filtered_data)
             filtered_data.mask |= do * do > varfunc(filtered_data) * sig ** 2
         iters = i + 1
         #TODO: ?print iters to the log if iters was None?
     else:
         for i in range(iters):
+            lastrej = filtered_data.count()
+            if lastrej <= minpoints:
+                break
             do = filtered_data - cenfunc(filtered_data)
             filtered_data.mask |= do * do > varfunc(filtered_data) * sig ** 2
 
